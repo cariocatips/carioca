@@ -122,87 +122,117 @@
 
     <script>
 
-        let vagas = 05;
+    let vagas = 5;
 
-        setInterval(function() {
-            if (vagas > 1) {
-                vagas--;
-                document.getElementById("contador").innerText = vagas;
-            }
-        }, 5000);
+    setInterval(function() {
+        if (vagas > 1) {
+            vagas--;
+            document.getElementById("contador").innerText = vagas;
+        }
+    }, 5000);
 
-        function getCookie(name) {
-            return document.cookie.split('; ').find(r => r.startsWith(name + '='))?.split('=')[1] || null;
+    function getCookie(name) {
+        return document.cookie.split('; ').find(r => r.startsWith(name + '='))?.split('=')[1] || null;
+    }
+
+    function buildFbc() {
+        const fbclid = new URLSearchParams(location.search).get('fbclid');
+        return fbclid ? ('fb.1.' + Date.now() + '.' + fbclid) : null;
+    }
+
+    function getUTMs() {
+        const params = new URLSearchParams(window.location.search);
+
+        return {
+            utm_source: params.get("utm_source"),
+            utm_medium: params.get("utm_medium"),
+            utm_campaign: params.get("utm_campaign"),
+            utm_content: params.get("utm_content"),
+            utm_term: params.get("utm_term"),
+            utm_id: params.get("utm_id"),
+            ad_id: params.get("ad_id"),
+            adset_id: params.get("adset_id")
+        };
+    }
+
+    function sendCapi(path, body) {
+        return fetch('https://metaa.onrender.com' + path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            mode: 'cors',
+            keepalive: true
+        }).catch(() => {});
+    }
+
+    function sendPageViewOnce() {
+
+        if (sessionStorage.getItem('pv_sent') === '1') return;
+
+        const eventId = (crypto && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : ('pv-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+
+        const fbp = getCookie('_fbp') || null;
+        const fbc = buildFbc();
+        const utms = getUTMs();
+
+        const payload = {
+            event_id: eventId,
+            source_url: location.href,
+            utms: utms,
+            ...(fbp ? { fbp } : {}),
+            ...(fbc ? { fbc } : {})
+        };
+
+        // Pixel (PageView)
+        if (typeof fbq !== "undefined") {
+            fbq('track', 'PageView', {}, { eventID: eventId });
         }
 
-        function buildFbc() {
-            const fbclid = new URLSearchParams(location.search).get('fbclid');
-            return fbclid ? ('fb.1.' + Date.now() + '.' + fbclid) : null;
+        sendCapi('/capi/pageview', payload);
+
+        sessionStorage.setItem('pv_sent', '1');
+    }
+
+    window.addEventListener('DOMContentLoaded', sendPageViewOnce);
+
+    function enviarLeadCAPI(eventId) {
+
+        const fbp = getCookie('_fbp') || null;
+        const fbc = buildFbc();
+        const utms = getUTMs();
+
+        const payload = {
+            event_id: eventId,
+            source_url: location.href,
+            utms: utms,
+            ...(fbp ? { fbp } : {}),
+            ...(fbc ? { fbc } : {})
+        };
+
+        sendCapi('/capi/lead', payload);
+    }
+
+    function irTelegram() {
+
+        const eventId = (crypto && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : ('lead-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+
+        // Pixel (Lead com deduplicação)
+        if (typeof fbq !== "undefined") {
+            fbq('track', 'Lead', {}, { eventID: eventId });
         }
 
-        function sendCapi(path, body) {
-            return fetch('https://metaa.onrender.com' + path, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-                mode: 'cors',
-                keepalive: true
-            }).catch(() => {});
-        }
+        enviarLeadCAPI(eventId);
 
-        function sendPageViewOnce() {
+        setTimeout(() => {
+            window.location.href = "https://cariocatips.github.io/carioca/redir.html" + window.location.search;
+        }, 400);
+    }
 
-            if (sessionStorage.getItem('pv_sent') === '1') return;
-
-            const eventId = (crypto && crypto.randomUUID)
-                ? crypto.randomUUID()
-                : ('pv-' + Date.now() + '-' + Math.random().toString(36).slice(2));
-
-            const fbp = getCookie('_fbp') || null;
-            const fbc = buildFbc();
-
-            const payload = {
-                event_id: eventId,
-                source_url: location.href,
-                ...(fbp ? { fbp } : {}),
-                ...(fbc ? { fbc } : {})
-            };
-
-            sendCapi('/capi/pageview', payload);
-            sessionStorage.setItem('pv_sent', '1');
-        }
-
-        window.addEventListener('DOMContentLoaded', sendPageViewOnce);
-
-        function enviarLeadCAPI(eventId) {
-
-            const fbp = getCookie('_fbp') || null;
-            const fbc = buildFbc();
-
-            const payload = {
-                event_id: eventId,
-                source_url: location.href,
-                ...(fbp ? { fbp } : {}),
-                ...(fbc ? { fbc } : {})
-            };
-
-            sendCapi('/capi/lead', payload);
-        }
-
-        function irTelegram() {
-
-            const eventId = (crypto && crypto.randomUUID)
-                ? crypto.randomUUID()
-                : ('lead-' + Date.now() + '-' + Math.random().toString(36).slice(2));
-
-            enviarLeadCAPI(eventId);
-
-            setTimeout(() => {
-                window.location.href = "https://cariocatips.github.io/carioca/redir.html";
-            }, 400);
-        }
-
-    </script>
+</script>
 
 </body>
 </html>
